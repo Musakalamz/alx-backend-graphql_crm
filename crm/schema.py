@@ -4,6 +4,10 @@ import graphene
 from django.db import transaction
 from django.utils import timezone
 from graphene_django import DjangoObjectType
+from graphene import relay
+from graphene_django.filter import DjangoFilterConnectionField
+from django_filters import rest_framework as filters
+from .filters import CustomerFilter, ProductFilter, OrderFilter
 from graphql import GraphQLError
 from .models import Customer, Product, Order
 
@@ -11,19 +15,55 @@ from .models import Customer, Product, Order
 class CustomerType(DjangoObjectType):
     class Meta:
         model = Customer
-        fields = ("id", "name", "email", "phone")
+        fields = ("id", "name", "email", "phone", "created_at")
+        interfaces = (graphene.relay.Node,)
+
+
+class CustomerNode(DjangoObjectType):
+    class Meta:
+        model = Customer
+        fields = ("id", "name", "email", "phone", "created_at")
+        interfaces = (relay.Node,)
 
 
 class ProductType(DjangoObjectType):
     class Meta:
         model = Product
-        fields = ("id", "name", "price", "stock")
+        fields = ("id", "name", "price", "stock", "created_at")
+        interfaces = (graphene.relay.Node,)
 
 
 class OrderType(DjangoObjectType):
     class Meta:
         model = Order
         fields = ("id", "customer", "products", "total_amount", "order_date")
+        interfaces = (graphene.relay.Node,)
+
+
+class CustomerFilterInput(graphene.InputObjectType):
+    nameIcontains = graphene.String()
+    emailIcontains = graphene.String()
+    createdAtGte = graphene.String()
+    createdAtLte = graphene.String()
+    phonePattern = graphene.String()
+
+
+class ProductFilterInput(graphene.InputObjectType):
+    nameIcontains = graphene.String()
+    priceGte = graphene.Float()
+    priceLte = graphene.Float()
+    stockGte = graphene.Int()
+    stockLte = graphene.Int()
+
+
+class OrderFilterInput(graphene.InputObjectType):
+    totalAmountGte = graphene.Float()
+    totalAmountLte = graphene.Float()
+    orderDateGte = graphene.String()
+    orderDateLte = graphene.String()
+    customerName = graphene.String()
+    productName = graphene.String()
+    productId = graphene.Int()
 
 
 class CRMQuery(graphene.ObjectType):
@@ -32,11 +72,88 @@ class CRMQuery(graphene.ObjectType):
 
 class Query(graphene.ObjectType):
     hello = graphene.String(default_value="Hello, GraphQL!")
-    all_customers = graphene.List(CustomerType)
+    all_customers = DjangoFilterConnectionField(
+        CustomerNode,
+        filter=graphene.Argument(CustomerFilterInput),
+        orderBy=graphene.String(),
+        filterset_class=CustomerFilter,
+    )
+    all_products = DjangoFilterConnectionField(
+        ProductType,
+        filter=graphene.Argument(ProductFilterInput),
+        orderBy=graphene.String(),
+        filterset_class=ProductFilter,
+    )
+    all_orders = DjangoFilterConnectionField(
+        OrderType,
+        filter=graphene.Argument(OrderFilterInput),
+        orderBy=graphene.String(),
+        filterset_class=OrderFilter,
+    )
 
     @staticmethod
-    def resolve_all_customers(root, info):
-        return Customer.objects.all()
+    def resolve_all_customers(root, info, filter=None, orderBy=None, **kwargs):
+        qs = Customer.objects.all()
+        data = {}
+        if filter:
+            if filter.nameIcontains:
+                data['name'] = filter.nameIcontains
+            if filter.emailIcontains:
+                data['email'] = filter.emailIcontains
+            if filter.createdAtGte:
+                data['created_at__gte'] = filter.createdAtGte
+            if filter.createdAtLte:
+                data['created_at__lte'] = filter.createdAtLte
+            if filter.phonePattern:
+                data['phone_pattern'] = filter.phonePattern
+            qs = CustomerFilter(data=data, queryset=qs).qs
+        if orderBy:
+            qs = qs.order_by(orderBy)
+        return qs
+
+    @staticmethod
+    def resolve_all_products(root, info, filter=None, orderBy=None, **kwargs):
+        qs = Product.objects.all()
+        data = {}
+        if filter:
+            if filter.nameIcontains:
+                data['name'] = filter.nameIcontains
+            if filter.priceGte is not None:
+                data['price__gte'] = filter.priceGte
+            if filter.priceLte is not None:
+                data['price__lte'] = filter.priceLte
+            if filter.stockGte is not None:
+                data['stock__gte'] = filter.stockGte
+            if filter.stockLte is not None:
+                data['stock__lte'] = filter.stockLte
+            qs = ProductFilter(data=data, queryset=qs).qs
+        if orderBy:
+            qs = qs.order_by(orderBy)
+        return qs
+
+    @staticmethod
+    def resolve_all_orders(root, info, filter=None, orderBy=None, **kwargs):
+        qs = Order.objects.all().distinct()
+        data = {}
+        if filter:
+            if filter.totalAmountGte is not None:
+                data['total_amount__gte'] = filter.totalAmountGte
+            if filter.totalAmountLte is not None:
+                data['total_amount__lte'] = filter.totalAmountLte
+            if filter.orderDateGte:
+                data['order_date__gte'] = filter.orderDateGte
+            if filter.orderDateLte:
+                data['order_date__lte'] = filter.orderDateLte
+            if filter.customerName:
+                data['customer_name'] = filter.customerName
+            if filter.productName:
+                data['product_name'] = filter.productName
+            if filter.productId is not None:
+                data['product_id'] = filter.productId
+            qs = OrderFilter(data=data, queryset=qs).qs
+        if orderBy:
+            qs = qs.order_by(orderBy)
+        return qs
 
 
 class CreateCustomerInput(graphene.InputObjectType):
