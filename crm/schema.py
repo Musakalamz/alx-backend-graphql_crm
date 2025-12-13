@@ -30,6 +30,15 @@ class CRMQuery(graphene.ObjectType):
     hello = graphene.String(default_value="Hello, GraphQL!")
 
 
+class Query(graphene.ObjectType):
+    hello = graphene.String(default_value="Hello, GraphQL!")
+    all_customers = graphene.List(CustomerType)
+
+    @staticmethod
+    def resolve_all_customers(root, info):
+        return Customer.objects.all()
+
+
 class CreateCustomerInput(graphene.InputObjectType):
     name = graphene.String(required=True)
     email = graphene.String(required=True)
@@ -163,3 +172,6 @@ class Mutation(graphene.ObjectType):
     bulk_create_customers = BulkCreateCustomers.Field()
     create_product = CreateProduct.Field()
     create_order = CreateOrder.Field()
+
+# Backward alias to satisfy imports expecting CRMQuery
+CRMQuery = Query
