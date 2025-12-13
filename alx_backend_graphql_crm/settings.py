@@ -125,5 +125,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Graphene configuration: reference the root schema
 GRAPHENE = {
-    'SCHEMA': 'alx_backend_graphql.schema.schema',
+    'SCHEMA': 'graphql_crm.schema.schema',
 }
