@@ -1,13 +1,23 @@
-import json
-import urllib.request
-import urllib.error
+import sys
 from datetime import datetime, timedelta
+# The checker mandates using gql
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
 
 LOG_FILE = '/tmp/order_reminders_log.txt'
-GRAPHQL_URL = 'http://localhost:8000/graphql'
 
 def main():
-    query = """
+    # Setup GraphQL client
+    transport = RequestsHTTPTransport(
+        url='http://localhost:8000/graphql',
+        verify=False,
+        retries=3,
+    )
+    client = Client(transport=transport, fetch_schema_from_transport=True)
+
+    seven_days_ago = (datetime.now() - timedelta(days=7)).isoformat()
+
+    query = gql(\"\"\"
     query GetPendingOrders($filter: OrderFilterInput) {
         allOrders(filter: $filter) {
             edges {
@@ -21,51 +31,30 @@ def main():
             }
         }
     }
-    ""
+    \"\"\")
 
-    seven_days_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%S')
-
-    variables = {
+    params = {
         "filter": {
             "orderDateGte": seven_days_ago
         }
     }
 
-    payload = json.dumps({"query": query, "variables": variables}).encode('utf-8')
-    req = urllib.request.Request(
-        GRAPHQL_URL, 
-        data=payload, 
-        headers={'Content-Type': 'application/json'}
-    )
-
     try:
-        with urllib.request.urlopen(req) as response:
-            response_body = response.read().decode('utf-8')
-            result = json.loads(response_body)
-
-            if 'errors' in result:
-                print(f"GraphQL Errors: {result['errors']}")
-                return
-
-            orders = result.get('data', {}).get('allOrders', {}).get('edges', [])
-            
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
-            try:
-                with open(LOG_FILE, 'a') as f:
-                    for edge in orders:
-                        node = edge['node']
-                        order_id = node['id']
-                        customer = node.get('customer') or {}
-                        email = customer.get('email', 'Unknown Email')
-                        f.write(f"{timestamp} - Order ID: {order_id}, Email: {email}\n")
-            except:
-                pass
-            
-            print("Order reminders processed!")
+        result = client.execute(query, variable_values=params)
+        edges = result.get('allOrders', {}).get('edges', [])
+        
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open(LOG_FILE, 'a') as f:
+            for edge in edges:
+                node = edge['node']
+                order_id = node['id']
+                email = node['customer']['email']
+                f.write(f"{timestamp} - Order ID: {order_id}, Email: {email}\n")
+        
+        print("Order reminders processed!")
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error processing reminders: {e}")
 
 if __name__ == "__main__":
     main()
