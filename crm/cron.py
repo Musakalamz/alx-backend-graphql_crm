@@ -1,16 +1,24 @@
 from datetime import datetime
 from crm.schema import UpdateLowStockProducts
 from alx_backend_graphql_crm.schema import schema
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
 
 def log_crm_heartbeat():
     timestamp = datetime.now().strftime("%d/%m/%Y-%H:%M:%S")
     message = f"{timestamp} CRM is alive\n"
     
     try:
-        result = schema.execute('{ hello }')
-        if not result.errors:
-            message = f"{timestamp} CRM is alive (GraphQL Responsive)\n"
-    except:
+        transport = RequestsHTTPTransport(
+            url='http://localhost:8000/graphql',
+            verify=False,
+            retries=1,
+        )
+        client = Client(transport=transport, fetch_schema_from_transport=False)
+        query = gql('{ hello }')
+        result = client.execute(query)
+        message = f"{timestamp} CRM is alive (GraphQL Responsive)\n"
+    except Exception:
         pass
 
     try:
