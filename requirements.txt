@@ -1,0 +1,8 @@
+django>=5.2.7
+graphene-django
+django-filter
+django-crontab
+celery
+django-celery-beat
+redis
+gql[all]
