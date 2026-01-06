@@ -9,8 +9,7 @@ from graphene_django.filter import DjangoFilterConnectionField
 from django_filters import rest_framework as filters
 from .filters import CustomerFilter, ProductFilter, OrderFilter
 from graphql import GraphQLError
-from .models import Customer, Product, Order
-
+from crm.models import Customer, Product, Order
 
 class CustomerType(DjangoObjectType):
     class Meta:
@@ -18,13 +17,11 @@ class CustomerType(DjangoObjectType):
         fields = ("id", "name", "email", "phone", "created_at")
         interfaces = (graphene.relay.Node,)
 
-
 class CustomerNode(DjangoObjectType):
     class Meta:
         model = Customer
         fields = ("id", "name", "email", "phone", "created_at")
         interfaces = (relay.Node,)
-
 
 class ProductType(DjangoObjectType):
     class Meta:
@@ -32,13 +29,11 @@ class ProductType(DjangoObjectType):
         fields = ("id", "name", "price", "stock", "created_at")
         interfaces = (graphene.relay.Node,)
 
-
 class OrderType(DjangoObjectType):
     class Meta:
         model = Order
         fields = ("id", "customer", "products", "total_amount", "order_date")
         interfaces = (graphene.relay.Node,)
-
 
 class CustomerFilterInput(graphene.InputObjectType):
     nameIcontains = graphene.String()
@@ -47,14 +42,12 @@ class CustomerFilterInput(graphene.InputObjectType):
     createdAtLte = graphene.String()
     phonePattern = graphene.String()
 
-
 class ProductFilterInput(graphene.InputObjectType):
     nameIcontains = graphene.String()
     priceGte = graphene.Float()
     priceLte = graphene.Float()
     stockGte = graphene.Int()
     stockLte = graphene.Int()
-
 
 class OrderFilterInput(graphene.InputObjectType):
     totalAmountGte = graphene.Float()
@@ -65,10 +58,8 @@ class OrderFilterInput(graphene.InputObjectType):
     productName = graphene.String()
     productId = graphene.Int()
 
-
 class CRMQuery(graphene.ObjectType):
     hello = graphene.String(default_value="Hello, GraphQL!")
-
 
 class Query(graphene.ObjectType):
     hello = graphene.String(default_value="Hello, GraphQL!")
@@ -155,12 +146,10 @@ class Query(graphene.ObjectType):
             qs = qs.order_by(orderBy)
         return qs
 
-
 class CreateCustomerInput(graphene.InputObjectType):
     name = graphene.String(required=True)
     email = graphene.String(required=True)
     phone = graphene.String(required=False)
-
 
 class CreateCustomer(graphene.Mutation):
     class Arguments:
@@ -183,12 +172,10 @@ class CreateCustomer(graphene.Mutation):
         customer.save()
         return CreateCustomer(customer=customer, message="Customer created")
 
-
 class BulkCustomerInput(graphene.InputObjectType):
     name = graphene.String(required=True)
     email = graphene.String(required=True)
     phone = graphene.String(required=False)
-
 
 class BulkCreateCustomers(graphene.Mutation):
     class Arguments:
@@ -219,12 +206,10 @@ class BulkCreateCustomers(graphene.Mutation):
                 errors.append(f"Record {idx}: {str(e)}")
         return BulkCreateCustomers(customers=created, errors=errors)
 
-
 class CreateProductInput(graphene.InputObjectType):
     name = graphene.String(required=True)
     price = graphene.Decimal(required=True)
     stock = graphene.Int(required=False)
-
 
 class CreateProduct(graphene.Mutation):
     class Arguments:
@@ -247,12 +232,10 @@ class CreateProduct(graphene.Mutation):
         product.save()
         return CreateProduct(product=product)
 
-
 class CreateOrderInput(graphene.InputObjectType):
     customer_id = graphene.ID(required=True)
     product_ids = graphene.List(graphene.ID, required=True)
     order_date = graphene.DateTime(required=False)
-
 
 class CreateOrder(graphene.Mutation):
     class Arguments:
@@ -283,28 +266,23 @@ class CreateOrder(graphene.Mutation):
             order.save()
         return CreateOrder(order=order)
 
-
 class UpdateLowStockProducts(graphene.Mutation):
     products = graphene.List(ProductType)
     message = graphene.String()
 
     @staticmethod
     def mutate(root, info):
-        # Query products with stock < 10
         low_stock_products = Product.objects.filter(stock__lt=10)
         updated_products = []
-        
         with transaction.atomic():
             for product in low_stock_products:
                 product.stock += 10
                 product.save()
                 updated_products.append(product)
-        
         return UpdateLowStockProducts(
             products=updated_products,
             message="Low stock products updated successfully"
         )
-
 
 class Mutation(graphene.ObjectType):
     create_customer = CreateCustomer.Field()
@@ -313,7 +291,4 @@ class Mutation(graphene.ObjectType):
     create_order = CreateOrder.Field()
     update_low_stock_products = UpdateLowStockProducts.Field()
 
-
-# Backward alias to satisfy imports expecting CRMQuery
 CRMQuery = Query
-
